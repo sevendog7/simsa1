@@ -44,8 +44,8 @@
         <h1 class="text-3xl font-bold text-center text-blue-800 mb-6">적극행정 우수사례 2차 심사표 (개인별)</h1>
         
         <div class="absolute top-8 right-8 flex space-x-4 no-print">
-            <button id="send-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
-                전송
+            <button id="complete-button" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                입력완료 (저장)
             </button>
             <button id="print-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
                 출력 (MS Word)
@@ -115,6 +115,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const tableBody = document.getElementById('score-table-body');
             const numRows = 10;
+            const storageKey = 'activeAdminEvaluationData'; // 로컬 저장소 키
 
             // 1. 테이블 행 동적 생성
             for (let i = 1; i <= numRows; i++) {
@@ -147,7 +148,7 @@
                 });
                 document.getElementById(`total-${caseId}`).innerText = total;
             }
-
+            
             // 3. 모든 점수 입력칸에 이벤트 리스너 추가
             const scoreInputs = document.querySelectorAll('.score-input');
             scoreInputs.forEach(input => {
@@ -159,47 +160,68 @@
                     }
                 });
             });
-            
-            // 4. 전송 버튼 기능
-            document.getElementById('send-button').addEventListener('click', () => {
-                const judgeName = document.getElementById('judge-name').value.trim() || '익명';
-                const rows = document.querySelectorAll('#score-table-body tr');
-                const results = [];
 
-                rows.forEach(row => {
-                    const caseNumber = row.querySelector('td:first-child').innerText;
-                    const caseNameInput = row.querySelector(`#case-${caseNumber}-name`);
-                    const caseName = caseNameInput ? caseNameInput.value : '';
-                    const totalScoreElement = row.querySelector(`#total-case-${caseNumber}`);
-                    const totalScore = totalScoreElement ? totalScoreElement.innerText : '0';
+            // [추가] 4. 데이터 저장 함수
+            function saveData() {
+                const dataToSave = {
+                    judgeName: document.getElementById('judge-name').value,
+                    chairName: document.getElementById('chair-name').value,
+                    cases: []
+                };
+
+                for (let i = 1; i <= numRows; i++) {
+                    const caseName = document.getElementById(`case-${i}-name`).value;
+                    const scores = Array.from(document.querySelectorAll(`[data-score-for="case-${i}"]`)).map(input => input.value);
+                    dataToSave.cases.push({ name: caseName, scores: scores });
+                }
+
+                localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+                alert('입력 내용이 성공적으로 저장되었습니다.');
+            }
+
+            // [추가] 5. 데이터 불러오기 함수
+            function loadData() {
+                const savedData = localStorage.getItem(storageKey);
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    document.getElementById('judge-name').value = data.judgeName || '';
+                    document.getElementById('chair-name').value = data.chairName || '';
                     
-                    // 점수가 있거나 사례명이 입력된 행만 전송
-                    if (parseInt(totalScore) > 0 || caseName.trim() !== '') {
-                        results.push({ number: caseNumber, name: caseName, score: totalScore });
-                    }
-                });
-                
-                const payload = { judgeName: judgeName, results: results };
-                const dataString = encodeURIComponent(JSON.stringify(payload));
-                
-                // summary.html을 새 탭에서 열기
-                const targetUrl = new URL('summary.html', window.location.href);
-                targetUrl.search = `?data=${dataString}`;
-                window.open(targetUrl.href, '_blank');
-            });
+                    data.cases.forEach((caseData, index) => {
+                        const i = index + 1;
+                        document.getElementById(`case-${i}-name`).value = caseData.name;
+                        const scoreInputsForRow = document.querySelectorAll(`[data-score-for="case-${i}"]`);
+                        scoreInputsForRow.forEach((input, scoreIndex) => {
+                            input.value = caseData.scores[scoreIndex] || '';
+                        });
+                        calculateTotal(`case-${i}`); // 저장된 값으로 합계 재계산
+                    });
+                }
+            }
+            
+            // [변경] 6. '입력완료' 버튼 기능 (저장)
+            document.getElementById('complete-button').addEventListener('click', saveData);
 
-            // 5. 출력 버튼 기능 (기존과 동일)
+            // [변경] 7. 출력 버튼 기능 (Word 파일 서식 수정)
             document.getElementById('print-button').addEventListener('click', () => {
                 const judgeName = document.getElementById('judge-name').value;
                 const chairName = document.getElementById('chair-name').value;
                 let tableHtml = '';
                 document.querySelectorAll('#score-table-body tr').forEach(row => {
-                    const caseName = row.querySelector(`#case-${row.querySelector('td').innerText}-name`).value;
-                    const scores = Array.from(row.querySelectorAll('.score-input')).map(input => input.value);
+                    const caseNumber = row.querySelector('td').innerText;
+                    const caseName = row.querySelector(`#case-${caseNumber}-name`).value;
+                    const scores = Array.from(row.querySelectorAll('.score-input')).map(input => input.value || '0');
                     const totalScore = row.querySelector('.text-lg').innerText;
-                    tableHtml += `<tr><td>${row.querySelector('td').innerText}</td><td>${caseName}</td><td>${scores[0]}</td><td>${scores[1]}</td><td>${scores[2]}</td><td>${scores[3]}</td><td>${scores[4]}</td><td>${totalScore}</td></tr>`;
+                    
+                    // 점수가 있거나 사례명이 입력된 행만 출력
+                    if (parseInt(totalScore) > 0 || caseName.trim() !== '') {
+                        tableHtml += `<tr><td>${caseNumber}</td><td style="text-align:left; padding-left:5px;">${caseName}</td><td>${scores[0]}</td><td>${scores[1]}</td><td>${scores[2]}</td><td>${scores[3]}</td><td>${scores[4]}</td><td>${totalScore}</td></tr>`;
+                    }
                 });
-                const htmlContent = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>적극행정 우수사례 2차 심사표 집계</title><style>body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:8pt;margin:0;padding:20px;box-sizing:border-box;}.header{text-align:center;}table{width:100%;border-collapse:collapse;margin-bottom:10px;page-break-inside:avoid;}th,td{border:1px solid #000;padding:3px;text-align:center;vertical-align:middle;}th{background-color:#f2f2f2;}.main-table th{background-color:#d1e2f7;}.signature-box{display:flex;justify-content:flex-end;margin-top:20px;font-size:10pt;}.signature-item{margin-left:30px;}.reference-table th{background-color:#e0e0e0;}.reference-table td,.reference-table th{font-size:6pt;vertical-align:middle;}.reference-table ul{text-align:left;margin:0;padding:0 0 0 10px;list-style-type:disc;}</style></head><body><div class="header"><h1 style="font-size:14pt;font-weight:bold;margin-bottom:10px;">적극행정 우수사례 2차 심사표 (개인별)</h1></div><table class="main-table"><thead><tr><th style="width:5%;">연번</th><th style="width:30%;">사례명</th><th style="width:10%;">국민 체감도 (20)</th><th style="width:10%;">적극성<br>및 창의성 (30)</th><th style="width:10%;">중요도 및<br>난이도 (30)</th><th style="width:10%;">확산 가능성 (10)</th><th style="width:10%;">국민 호응도 (10)</th><th style="width:15%;">합계 (100)</th></tr></thead><tbody>${tableHtml}</tbody></table><div class="signature-box"><div class="signature-item"><label>작성자(심사위원): ${judgeName} (인)</label></div><div class="signature-item"><label>확인자(위원장): ${chairName} (인)</label></div></div><div style="margin-top:20px;"><h2 style="font-size:12pt;font-weight:bold;text-align:center;margin-bottom:5px;">심사내용 배점기준표</h2><table class="reference-table"><thead><tr><th style="width:10%;">심사항목</th><th style="width:50%;">심사내용</th><th style="width:5%;">배점</th><th style="width:7%;">매우 우수</th><th style="width:7%;">우수</th><th style="width:7%;">보통</th><th style="width:7%;">미흡</th><th style="width:7%;">매우 미흡</th></tr></thead><tbody><tr><td>국민체감도</td><td><ul><li>국민 생활편의 및 만족도를 제고하거나 국가재정 절감에 기여하는 등 국민이 체감할 수 있는 변화 정도를 평가</li></ul></td><td>20</td><td>20-18</td><td>17-14</td><td>13~10</td><td>9~6</td><td>5~</td></tr><tr><td>적극성<br>창의성<br>전문성</td><td><ul><li>새로운 정책 발굴, 이해 조정 및 협업 등 문제해결을 위해 적극적으로 노력한 정도를 평가</li><li>해당 과제를 새로운 관점에서 효과적으로 해결하거나 전문지식 경험 등을 활용한 정도를 평가</li></ul></td><td>30</td><td>30-25</td><td>24-19</td><td>18-13</td><td>12-7</td><td>6-</td></tr><tr><td>중요도 및<br>난이도</td><td><ul><li>국가 전반의 경쟁력을 제고하는데 도움이 되는 정도</li><li>관련 업무나 민원요구를 해결하기 어려운 정도 또는 열악한 정책 환경 등을 평가</li></ul></td><td>30</td><td>30-25</td><td>24-19</td><td>18-13</td><td>12-7</td><td>6-</td></tr><tr><td>확산 가능성</td><td><ul><li>동 사례에서 나타난 적극행정 노력이 타 기관으로 확산될 가능성이 있는지를 평가</li></ul></td><td>10</td><td>10-9</td><td>8-7</td><td>6-5</td><td>4-3</td><td>2-</td></tr></tbody></table><table class="reference-table mt-4"><thead><tr><th style="width:10%;">심사항목</th><th style="width:50%;">심사내용</th><th style="width:5%;">배점</th><th style="width:7%;">1위</th><th style="width:7%;">2위</th><th style="width:7%;">3위</th><th style="width:7%;">4위</th><th style="width:7%;">5위</th><th style="width:7%;">6위 이하</th></tr></thead><tbody><tr><td>국민호응도</td><td><ul><li>온라인 국민투표 결과(1위~6위 이하 순위별 배점)</li></ul></td><td>10</td><td>10</td><td>9</td><td>8</td><td>7</td><td>6</td><td>5</td></tr></tbody></table></div></body></html>`;
+                
+                // [변경] Word 출력용 HTML 콘텐츠 (여백 및 서명란 수정)
+                const htmlContent = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>적극행정 우수사례 2차 심사표 집계</title><style>body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:8pt;margin:1.5cm;padding:0;box-sizing:border-box;}h1,h2{margin:0;padding:0;}.header{text-align:center;}table{width:100%;border-collapse:collapse;margin-bottom:10px;page-break-inside:avoid;}th,td{border:1px solid #000;padding:3px;text-align:center;vertical-align:middle;word-break:break-all;}th{background-color:#f2f2f2;}.main-table th{background-color:#d1e2f7;}.reference-table th{background-color:#e0e0e0;}.reference-table td,.reference-table th{font-size:7pt;vertical-align:middle;}.reference-table ul{text-align:left;margin:0;padding:0 0 0 10px;list-style-type:disc;}</style></head><body><div class="header"><h1 style="font-size:14pt;font-weight:bold;margin-bottom:15px;">적극행정 우수사례 2차 심사표 (개인별)</h1></div><table class="main-table"><thead><tr><th style="width:5%;">연번</th><th style="width:30%;">사례명</th><th style="width:10%;">국민 체감도 (20)</th><th style="width:10%;">적극성<br>및 창의성 (30)</th><th style="width:10%;">중요도 및<br>난이도 (30)</th><th style="width:10%;">확산 가능성 (10)</th><th style="width:10%;">국민 호응도 (10)</th><th style="width:15%;">합계 (100)</th></tr></thead><tbody>${tableHtml}</tbody></table><div style="text-align:right;margin-top:20px;font-size:10pt;"><span style="margin-right:80px;">작성자(심사위원): ${judgeName} (인)</span><span>확인자(위원장): ${chairName} (인)</span></div><div style="margin-top:30px;"><h2 style="font-size:12pt;font-weight:bold;text-align:center;margin-bottom:5px;">심사내용 배점기준표</h2><table class="reference-table"><thead><tr><th style="width:10%;">심사항목</th><th style="width:50%;">심사내용</th><th style="width:5%;">배점</th><th style="width:7%;">매우 우수</th><th style="width:7%;">우수</th><th style="width:7%;">보통</th><th style="width:7%;">미흡</th><th style="width:7%;">매우 미흡</th></tr></thead><tbody><tr><td>국민체감도</td><td style="text-align:left;padding-left:5px;"><ul><li>국민 생활편의 및 만족도를 제고하거나 국가재정 절감에 기여하는 등 국민이 체감할 수 있는 변화 정도를 평가</li></ul></td><td>20</td><td>20-18</td><td>17-14</td><td>13~10</td><td>9~6</td><td>5~</td></tr><tr><td>적극성<br>창의성<br>전문성</td><td style="text-align:left;padding-left:5px;"><ul><li>새로운 정책 발굴, 이해 조정 및 협업 등 문제해결을 위해 적극적으로 노력한 정도를 평가</li><li>해당 과제를 새로운 관점에서 효과적으로 해결하거나 전문지식 경험 등을 활용한 정도를 평가</li></ul></td><td>30</td><td>30-25</td><td>24-19</td><td>18-13</td><td>12-7</td><td>6-</td></tr><tr><td>중요도 및<br>난이도</td><td style="text-align:left;padding-left:5px;"><ul><li>국가 전반의 경쟁력을 제고하는데 도움이 되는 정도</li><li>관련 업무나 민원요구를 해결하기 어려운 정도 또는 열악한 정책 환경 등을 평가</li></ul></td><td>30</td><td>30-25</td><td>24-19</td><td>18-13</td><td>12-7</td><td>6-</td></tr><tr><td>확산 가능성</td><td style="text-align:left;padding-left:5px;"><ul><li>동 사례에서 나타난 적극행정 노력이 타 기관으로 확산될 가능성이 있는지를 평가</li></ul></td><td>10</td><td>10-9</td><td>8-7</td><td>6-5</td><td>4-3</td><td>2-</td></tr></tbody></table><table class="reference-table" style="margin-top:10px;"><thead><tr><th style="width:10%;">심사항목</th><th style="width:50%;">심사내용</th><th style="width:5%;">배점</th><th style="width:7%;">1위</th><th style="width:7%;">2위</th><th style="width:7%;">3위</th><th style="width:7%;">4위</th><th style="width:7%;">5위</th><th style="width:7%;">6위 이하</th></tr></thead><tbody><tr><td>국민호응도</td><td style="text-align:left;padding-left:5px;"><ul><li>온라인 국민투표 결과(1위~6위 이하 순위별 배점)</li></ul></td><td>10</td><td>10</td><td>9</td><td>8</td><td>7</td><td>6</td><td>5</td></tr></tbody></table></div></body></html>`;
+
                 const blob = new Blob([htmlContent], { type: 'application/msword' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -210,6 +232,9 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             });
+            
+            // 페이지 로드 시 저장된 데이터 불러오기
+            loadData();
         });
     </script>
 </body>
