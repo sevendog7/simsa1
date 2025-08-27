@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>심사 결과 합계</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+
+    <div class="max-w-7xl mx-auto bg-white shadow-xl rounded-2xl p-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-center text-blue-800">심사 결과 집계 현황</h1>
+            <button id="reset-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 no-print">
+                결과 초기화
+            </button>
+        </div>
+
+        <div id="summary-container" class="overflow-x-auto rounded-xl">
+            <!-- 자바스크립트로 합계 테이블이 여기에 생성됩니다. -->
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'judgingSummary';
+
+        /**
+         * 데이터를 받아 테이블을 렌더링하는 메인 함수
+         */
+        function renderTable() {
+            const summaryContainer = document.getElementById('summary-container');
+            summaryContainer.innerHTML = ''; // 컨테이너 초기화
+
+            const storedData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            const { cases = [], judges = [] } = storedData;
+            const judgeCount = judges.length;
+
+            if (judgeCount === 0) {
+                summaryContainer.innerHTML = '<p class="text-center text-gray-500">전송된 데이터가 없습니다.</p>';
+                return;
+            }
+
+            // 최종 점수 및 순위 계산
+            let finalResults = cases.map((caseItem, index) => {
+                const scores = [...caseItem.scores].sort((a, b) => a - b);
+                let scoresToSum;
+
+                // 심사위원이 3명 이상일 때만 최고점과 최저점을 제외합니다.
+                if (scores.length > 2) {
+                    scoresToSum = scores.slice(1, -1); 
+                } else {
+                    scoresToSum = scores; // 2명 이하일때는 모든 점수를 합산합니다.
+                }
+
+                const total = scoresToSum.reduce((acc, val) => acc + (val || 0), 0);
+                const average = scoresToSum.length > 0 ? total / scoresToSum.length : 0;
+                return { index, total, average };
+            });
+
+            // 최종합계를 기준으로 내림차순 정렬
+            finalResults.sort((a, b) => b.total - a.total);
+
+            // 순위 부여 (동점 처리 포함)
+            let rank = 1;
+            for (let i = 0; i < finalResults.length; i++) {
+                if (i > 0 && finalResults[i].total < finalResults[i - 1].total) {
+                    rank = i + 1;
+                }
+                finalResults[i].rank = rank;
+            }
+
+            // 테이블 생성
+            const table = document.createElement('table');
+            table.className = 'w-full text-sm text-left text-gray-700';
+            
+            // 테이블 헤더 생성
+            let headerHTML = `
+                <thead class="text-xs text-white uppercase bg-blue-600">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 text-center">연번</th>
+                        <th scope="col" class="px-4 py-3 text-left">사례명</th>`;
+            
+            judges.forEach(name => {
+                headerHTML += `<th scope="col" class="px-4 py-3 text-center">${name}</th>`;
+            });
+
+            headerHTML += `
+                    <th scope="col" class="px-4 py-3 text-center bg-green-700">최종합계</th>
+                    <th scope="col" class="px-4 py-3 text-center bg-green-700">평균</th>
+                    <th scope="col" class="px-4 py-3 text-center bg-green-700">순위</th>
+                </tr></thead>`;
+            table.innerHTML = headerHTML;
+
+            // 테이블 바디 생성
+            const tbody = document.createElement('tbody');
+            tbody.className = 'bg-white divide-y divide-gray-200';
+            
+            cases.forEach((caseItem, index) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                let rowHTML = `
+                    <td class="px-4 py-4 text-center font-medium text-gray-900">${index + 1}</td>
+                    <td class="px-4 py-4 text-left">${caseItem.name || '<i>입력되지 않음</i>'}</td>`;
+                
+                for (let i = 0; i < judgeCount; i++) {
+                    rowHTML += `<td class="px-4 py-4 text-center">${caseItem.scores[i] !== undefined ? caseItem.scores[i] : '-'}</td>`;
+                }
+
+                const result = finalResults.find(r => r.index === index);
+                rowHTML += `
+                    <td class="px-4 py-4 text-center font-bold text-green-700">${result.total}</td>
+                    <td class="px-4 py-4 text-center font-bold text-green-700">${result.average.toFixed(2)}</td>
+                    <td class="px-4 py-4 text-center font-bold text-green-700">${result.rank}</td>`;
+                
+                row.innerHTML = rowHTML;
+                tbody.appendChild(row);
+            });
+
+            table.appendChild(tbody);
+            summaryContainer.appendChild(table);
+        }
+
+        /**
+         * 페이지 로드 시 실행되는 초기화 함수
+         */
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const newDataParam = urlParams.get('data');
+
+            if (newDataParam) {
+                try {
+                    const payload = JSON.parse(decodeURIComponent(newDataParam));
+                    const { judgeName, results: newJudgeData } = payload;
+
+                    let storedData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+                    
+                    if (!storedData.cases || storedData.cases.length === 0) {
+                        storedData = {
+                            cases: newJudgeData.map(d => ({ name: d.name, scores: [parseInt(d.score, 10)] })),
+                            judges: [judgeName]
+                        };
+                    } else {
+                        storedData.judges.push(judgeName);
+                        newJudgeData.forEach((item, index) => {
+                            if (storedData.cases[index]) {
+                                storedData.cases[index].scores.push(parseInt(item.score, 10));
+                            } else {
+                                const emptyScores = Array(storedData.judges.length - 1).fill(0);
+                                storedData.cases[index] = { name: item.name, scores: [...emptyScores, parseInt(item.score, 10)] };
+                            }
+                        });
+                    }
+                    
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData));
+                    history.replaceState(null, '', window.location.pathname);
+
+                } catch (error) {
+                    console.error("Error processing new data:", error);
+                }
+            }
+
+            document.getElementById('reset-button').addEventListener('click', () => {
+                if (confirm('정말로 모든 집계 결과를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                    localStorage.removeItem(STORAGE_KEY);
+                    renderTable();
+                }
+            });
+
+            renderTable();
+        };
+    </script>
+
+</body>
+</html>
