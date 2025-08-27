@@ -175,13 +175,15 @@
                     
                     // 점수가 있거나 사례명이 입력된 행만 전송
                     if (parseInt(totalScore) > 0 || caseName.trim() !== '') {
-                         results.push({ name: caseName, score: totalScore });
+                        // MODIFIED: Added 'number' to the object to preserve sequence order
+                        results.push({ number: caseNumber, name: caseName, score: totalScore });
                     }
                 });
                 
                 const payload = { judgeName: judgeName, results: results };
                 const dataString = encodeURIComponent(JSON.stringify(payload));
                 
+                // Navigate to the summary page with the data
                 const targetUrl = new URL('summary.html', window.location.href);
                 targetUrl.search = `?data=${dataString}`;
                 window.location.href = targetUrl.href;
