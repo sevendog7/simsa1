@@ -3,156 +3,257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>심사결과 집계</title>
-    <!-- Tailwind CSS 로딩 -->
+    <title>적극행정 우수사례 2차 심사표 집계</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 로딩 스피너 스타일 */
-        .loader {
-            border: 8px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 8px solid #3498db;
-            width: 60px;
-            height: 60px;
-            animation: spin 2s linear infinite;
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
         }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            left: 50%;
+            bottom: 30px;
+            opacity: 0;
+            transition: visibility 0s 0.5s, opacity 0.5s linear;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+            transition: opacity 0.5s linear;
         }
     </style>
 </head>
-<body class="bg-gray-100 font-sans p-4 sm:p-6 md:p-8">
-
-    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-6 md:p-8">
-        <header class="mb-6 pb-4 border-b border-gray-200">
-            <h1 class="text-3xl font-bold text-gray-800 text-center">심사결과 최종 집계</h1>
-            <p class="text-center text-gray-500 mt-2">심사표 1번부터 9번까지의 합산 결과입니다.</p>
-        </header>
-
-        <!-- 데이터 로딩 시 보여줄 스피너 -->
-        <div id="loading" class="flex flex-col items-center justify-center py-12">
-            <div class="loader mb-4"></div>
-            <p class="text-gray-600">데이터를 집계하는 중입니다...</p>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-7xl mx-auto bg-white shadow-xl rounded-2xl p-8 relative">
+        <h1 class="text-3xl font-bold text-center text-blue-800 mb-6">적극행정 우수사례 2차 심사표 (개인별)</h1>
+        
+        <div class="absolute top-8 right-8 flex space-x-4 no-print">
+            <button id="send-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                전송
+            </button>
+            <button id="print-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                출력 (MS Word)
+            </button>
         </div>
 
-        <!-- 결과 테이블 -->
-        <div id="result-table-container" class="hidden">
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
-                    <thead class="bg-gray-200">
-                        <tr>
-                            <th class="py-3 px-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">연번</th>
-                            <th class="py-3 px-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">합계</th>
-                        </tr>
-                    </thead>
-                    <tbody id="summary-body" class="divide-y divide-gray-200">
-                        <!-- 자바스크립트로 데이터가 채워질 부분 -->
-                    </tbody>
-                </table>
+        <div class="overflow-x-auto rounded-xl mb-8">
+            <table class="w-full text-sm text-left text-gray-700 rounded-xl overflow-hidden">
+                <thead class="text-xs text-white uppercase bg-blue-600">
+                    <tr>
+                        <th scope="col" class="px-3 py-2 text-center">연번</th>
+                        <th scope="col" class="px-3 py-2 text-center">사례명</th>
+                        <th scope="col" class="px-3 py-2 text-center">국민<br>체감도 (20)</th>
+                        <th scope="col" class="px-3 py-2 text-center">적극성<br>및 창의성 (30)</th>
+                        <th scope="col" class="px-3 py-2 text-center">중요도 및<br>난이도 (30)</th>
+                        <th scope="col" class="px-3 py-2 text-center">확산<br>가능성 (10)</th>
+                        <th scope="col" class="px-3 py-2 text-center">국민<br>호응도 (10)</th>
+                        <th scope="col" class="px-3 py-2 text-center font-bold">합계 (100)</th>
+                    </tr>
+                </thead>
+                <tbody id="score-table-body" class="bg-white divide-y divide-gray-200">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-end items-center space-y-4 sm:space-y-0 sm:space-x-8 mt-8">
+            <div class="flex items-center space-x-2">
+                <label for="judge-name" class="text-gray-700 font-semibold">작성자(심사위원):</label>
+                <div class="flex items-center p-2 border-b border-gray-300">
+                    <input type="text" id="judge-name" class="p-1 w-32 focus:outline-none bg-white">
+                    <span class="ml-2 font-bold">(인)</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <label for="chair-name" class="text-gray-700 font-semibold">확인자(위원장):</label>
+                <div class="flex items-center p-2 border-b border-gray-300">
+                    <input type="text" id="chair-name" class="p-1 w-32 focus:outline-none bg-white">
+                    <span class="ml-2 font-bold">(인)</span>
+                </div>
             </div>
         </div>
     </div>
+    <div id="toast-notification" class="toast"></div>
 
-    <script>
+    <script type="module">
+        // Firebase SDK import
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        let db;
+
+        // --- App Initialization ---
         document.addEventListener('DOMContentLoaded', async () => {
-            const baseUrl = 'https://sevendog7.github.io/simsa1/';
-            const totalFiles = 9;
-            // Map: { 연번 => 총점 } 형태로 데이터를 저장합니다.
-            const scores = new Map();
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                const auth = getAuth(app);
 
-            // 로딩 UI를 먼저 보여줍니다.
-            const loadingIndicator = document.getElementById('loading');
-            const resultContainer = document.getElementById('result-table-container');
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showToast("데이터베이스 연결에 실패했습니다.", true);
+            }
+            
+            initializePage();
+        });
+
+        function initializePage() {
+            const tableBody = document.getElementById('score-table-body');
+            const numRows = 10;
+
+            for (let i = 1; i <= numRows; i++) {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors duration-200';
+                row.innerHTML = `
+                    <td class="px-3 py-2 text-center text-gray-900 font-medium">${i}</td>
+                    <td class="px-3 py-2"><input type="text" id="case-${i}-name" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 transition duration-300 text-sm"></td>
+                    <td class="px-3 py-2 text-center"><input type="number" data-score-for="case-${i}" data-max="20" class="score-input w-20 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-center transition duration-300 text-sm"></td>
+                    <td class="px-3 py-2 text-center"><input type="number" data-score-for="case-${i}" data-max="30" class="score-input w-20 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-center transition duration-300 text-sm"></td>
+                    <td class="px-3 py-2 text-center"><input type="number" data-score-for="case-${i}" data-max="30" class="score-input w-20 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-center transition duration-300 text-sm"></td>
+                    <td class="px-3 py-2 text-center"><input type="number" data-score-for="case-${i}" data-max="10" class="score-input w-20 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-center transition duration-300 text-sm"></td>
+                    <td class="px-3 py-2 text-center"><input type="number" data-score-for="case-${i}" data-max="10" class="score-input w-20 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-center transition duration-300 text-sm"></td>
+                    <td class="px-3 py-2 text-center font-bold text-lg text-blue-700" id="total-case-${i}">0</td>
+                `;
+                tableBody.appendChild(row);
+            }
+
+            const scoreInputs = document.querySelectorAll('.score-input');
+            scoreInputs.forEach(input => {
+                input.addEventListener('input', (event) => {
+                    const caseId = event.target.dataset.scoreFor;
+                    calculateTotal(caseId);
+                });
+            });
+
+            document.getElementById('send-button').addEventListener('click', sendDataToFirestore);
+            document.getElementById('print-button').addEventListener('click', generateWordDoc);
+        }
+
+        function calculateTotal(caseId) {
+            const scoreInputs = document.querySelectorAll(`[data-score-for="${caseId}"]`);
+            let total = 0;
+            scoreInputs.forEach(input => {
+                input.value = input.value.split('.')[0];
+                const value = parseInt(input.value) || 0;
+                const max = parseInt(input.dataset.max);
+                if (value > max) { input.value = max; }
+                else if (value < 0) { input.value = 0; }
+                total += parseInt(input.value) || 0;
+            });
+            document.getElementById(`total-${caseId}`).innerText = total;
+        }
+
+        async function sendDataToFirestore() {
+            if (!db) {
+                showToast("데이터베이스에 연결되지 않았습니다.", true);
+                return;
+            }
+            const judgeName = document.getElementById('judge-name').value.trim();
+            if (!judgeName) {
+                showToast("작성자(심사위원) 이름을 입력해주세요.", true);
+                return;
+            }
+
+            const rows = document.querySelectorAll('#score-table-body tr');
+            const results = [];
+            let hasData = false;
+
+            rows.forEach(row => {
+                const caseNumber = row.querySelector('td:first-child').innerText;
+                const caseName = row.querySelector(`#case-${caseNumber}-name`).value.trim();
+                const totalScore = parseInt(row.querySelector(`#total-case-${caseNumber}`).innerText) || 0;
+                
+                if (totalScore > 0 || caseName !== '') {
+                    hasData = true;
+                }
+                results.push({ 
+                    number: parseInt(caseNumber), 
+                    name: caseName, 
+                    score: totalScore 
+                });
+            });
+
+            if (!hasData) {
+                showToast("전송할 데이터가 없습니다. 점수나 사례명을 입력해주세요.", true);
+                return;
+            }
+
+            const payload = {
+                judgeName: judgeName,
+                results: results,
+                submittedAt: serverTimestamp()
+            };
 
             try {
-                // 여러 fetch 요청을 동시에 처리하기 위해 Promise 배열을 생성합니다.
-                const fetchPromises = [];
-                for (let i = 1; i <= totalFiles; i++) {
-                    const url = `${baseUrl}simsapyo${i}.html`;
-                    fetchPromises.push(
-                        fetch(url)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`${url} 파일을 불러오는 데 실패했습니다.`);
-                                }
-                                return response.text();
-                            })
-                    );
-                }
-
-                // 모든 HTML 파일 내용을 한 번에 가져옵니다.
-                const htmlContents = await Promise.all(fetchPromises);
-
-                // 가져온 HTML 내용을 순서대로 처리합니다.
-                htmlContents.forEach(html => {
-                    // 문자열 형태의 HTML을 DOM 객체로 파싱합니다.
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    // 테이블의 모든 행(row)을 선택합니다. (헤더 제외)
-                    const rows = doc.querySelectorAll('table tr:not(:first-child)');
-
-                    rows.forEach(row => {
-                        const cells = row.querySelectorAll('td');
-                        // 각 행에 7개의 셀이 있는지 확인합니다.
-                        if (cells.length === 7) {
-                            // 첫 번째 셀(연번)과 마지막 셀(합계)의 텍스트를 가져옵니다.
-                            const serialNumber = parseInt(cells[0].textContent.trim(), 10);
-                            const totalScore = parseFloat(cells[6].textContent.trim());
-
-                            // 유효한 숫자인 경우에만 계산합니다.
-                            if (!isNaN(serialNumber) && !isNaN(totalScore)) {
-                                // 기존 점수에 새로운 점수를 더합니다.
-                                const currentScore = scores.get(serialNumber) || 0;
-                                scores.set(serialNumber, currentScore + totalScore);
-                            }
-                        }
-                    });
-                });
-
-                // 집계가 끝나면 결과를 테이블에 표시합니다.
-                displayResults();
-
+                const docRef = doc(db, `artifacts/${appId}/public/data/scores`, judgeName);
+                await setDoc(docRef, payload);
+                showToast("심사 결과가 성공적으로 전송되었습니다.");
             } catch (error) {
-                // 에러 발생 시 메시지를 표시합니다.
-                loadingIndicator.innerHTML = `<p class="text-red-500 font-semibold">데이터 집계 중 오류가 발생했습니다: ${error.message}</p>`;
-                console.error('Error fetching or parsing data:', error);
+                console.error("Error writing document: ", error);
+                showToast("전송 중 오류가 발생했습니다.", true);
             }
+        }
 
-            function displayResults() {
-                const tbody = document.getElementById('summary-body');
-                tbody.innerHTML = ''; // 기존 내용을 비웁니다.
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast-notification');
+            toast.textContent = message;
+            toast.style.backgroundColor = isError ? '#ef4444' : '#22c55e';
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
 
-                // 연번을 기준으로 오름차순 정렬합니다.
-                const sortedScores = new Map([...scores.entries()].sort((a, b) => a[0] - b[0]));
-
-                // 정렬된 데이터를 테이블 행으로 만들어 추가합니다.
-                sortedScores.forEach((total, serial) => {
-                    const row = document.createElement('tr');
-                    row.className = 'hover:bg-gray-50 transition-colors duration-200';
-                    
-                    const serialCell = document.createElement('td');
-                    serialCell.className = 'py-3 px-4 text-gray-700';
-                    serialCell.textContent = serial;
-
-                    const scoreCell = document.createElement('td');
-                    scoreCell.className = 'py-3 px-4 text-gray-800 font-medium';
-                    // 소수점 둘째 자리까지 표시합니다.
-                    scoreCell.textContent = total.toFixed(2);
-
-                    row.appendChild(serialCell);
-                    row.appendChild(scoreCell);
-                    tbody.appendChild(row);
-                });
-
-                // 로딩 스피너를 숨기고 결과 테이블을 보여줍니다.
-                loadingIndicator.classList.add('hidden');
-                resultContainer.classList.remove('hidden');
-            }
-        });
+        function generateWordDoc() {
+             // This function remains unchanged for Word export
+            const judgeName = document.getElementById('judge-name').value;
+            const chairName = document.getElementById('chair-name').value;
+            let tableHtml = '';
+            document.querySelectorAll('#score-table-body tr').forEach(row => {
+                const caseName = row.querySelector(`#case-${row.querySelector('td').innerText}-name`).value;
+                const scores = Array.from(row.querySelectorAll('.score-input')).map(input => input.value);
+                const totalScore = row.querySelector('.text-lg').innerText;
+                tableHtml += `<tr><td>${row.querySelector('td').innerText}</td><td>${caseName}</td><td>${scores[0]}</td><td>${scores[1]}</td><td>${scores[2]}</td><td>${scores[3]}</td><td>${scores[4]}</td><td>${totalScore}</td></tr>`;
+            });
+            const htmlContent = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>적극행정 우수사례 2차 심사표 집계</title><style>body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:8pt;margin:0;padding:20px;box-sizing:border-box;}.header{text-align:center;}table{width:100%;border-collapse:collapse;margin-bottom:10px;page-break-inside:avoid;}th,td{border:1px solid #000;padding:3px;text-align:center;vertical-align:middle;}th{background-color:#f2f2f2;}.main-table th{background-color:#d1e2f7;}.signature-box{display:flex;justify-content:flex-end;margin-top:20px;font-size:10pt;}.signature-item{margin-left:30px;}.reference-table th{background-color:#e0e0e0;}.reference-table td,.reference-table th{font-size:6pt;vertical-align:middle;}.reference-table ul{text-align:left;margin:0;padding:0 0 0 10px;list-style-type:disc;}</style></head><body><div class="header"><h1 style="font-size:14pt;font-weight:bold;margin-bottom:10px;">적극행정 우수사례 2차 심사표 (개인별)</h1></div><table class="main-table"><thead><tr><th style="width:5%;">연번</th><th style="width:30%;">사례명</th><th style="width:10%;">국민 체감도 (20)</th><th style="width:10%;">적극성<br>및 창의성 (30)</th><th style="width:10%;">중요도 및<br>난이도 (30)</th><th style="width:10%;">확산 가능성 (10)</th><th style="width:10%;">국민 호응도 (10)</th><th style="width:15%;">합계 (100)</th></tr></thead><tbody>${tableHtml}</tbody></table><div class="signature-box"><div class="signature-item"><label>작성자(심사위원): ${judgeName} (인)</label></div><div class="signature-item"><label>확인자(위원장): ${chairName} (인)</label></div></div></body></html>`;
+            const blob = new Blob([htmlContent], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '적극행정_심사표.doc';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
     </script>
-
 </body>
 </html>
