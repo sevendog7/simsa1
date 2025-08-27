@@ -175,7 +175,6 @@
                     
                     // 점수가 있거나 사례명이 입력된 행만 전송
                     if (parseInt(totalScore) > 0 || caseName.trim() !== '') {
-                        // MODIFIED: Added 'number' to the object to preserve sequence order
                         results.push({ number: caseNumber, name: caseName, score: totalScore });
                     }
                 });
@@ -183,10 +182,10 @@
                 const payload = { judgeName: judgeName, results: results };
                 const dataString = encodeURIComponent(JSON.stringify(payload));
                 
-                // Navigate to the summary page with the data
+                // summary.html을 새 탭에서 열기
                 const targetUrl = new URL('summary.html', window.location.href);
                 targetUrl.search = `?data=${dataString}`;
-                window.location.href = targetUrl.href;
+                window.open(targetUrl.href, '_blank');
             });
 
             // 5. 출력 버튼 기능 (기존과 동일)
