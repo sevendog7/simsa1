@@ -273,16 +273,18 @@
                 showMessage("데이터베이스가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
                 return;
             }
+            // ★★★ 수정: 중첩 배열을 JSON 문자열로 변환 ★★★
+            const scoresArray = [];
+            for (let i = 1; i <= numRows; i++) {
+                const scores = Array.from(document.querySelectorAll(`[data-score-for="case-${i}"]`)).map(input => input.value);
+                scoresArray.push(scores.map(s => parseInt(s) || 0)); 
+            }
+            
             const dataToSave = {
                 judgeName: document.getElementById('judge-name').value,
-                scores: []
+                // 중첩 배열인 scoresArray를 JSON 문자열로 저장
+                scores: JSON.stringify(scoresArray)
             };
-            for (let i = 1; i <= numRows; i++) {
-                // DOMContentLoaded 내부에서 정의된 scoreInputs 대신, 쿼리셀렉터 사용
-                const scores = Array.from(document.querySelectorAll(`[data-score-for="case-${i}"]`)).map(input => input.value);
-                // Firestore에 저장 시 숫자로 변환 (배열 내의 원소 타입을 통일)
-                dataToSave.scores.push(scores.map(s => parseInt(s) || 0)); 
-            }
             
             // Store data in private path: /artifacts/{appId}/users/{userId}/evaluation_data/my_scores
             const docRef = doc(db, `artifacts/${appId}/users/${userId}/evaluation_data`, 'my_scores');
@@ -314,7 +316,16 @@
                     const judgeNameInput = document.getElementById('judge-name');
                     if(judgeNameInput) judgeNameInput.value = data.judgeName || '';
                     
-                    data.scores.forEach((scores, index) => {
+                    // ★★★ 수정: 저장된 JSON 문자열을 다시 배열로 파싱 ★★★
+                    let scoresData = [];
+                    try {
+                        scoresData = JSON.parse(data.scores || '[]');
+                    } catch (e) {
+                        console.error("Failed to parse scores data:", e);
+                        return;
+                    }
+                    
+                    scoresData.forEach((scores, index) => {
                         const i = index + 1;
                         const scoreInputsForRow = document.querySelectorAll(`[data-score-for="case-${i}"]`);
                         scoreInputsForRow.forEach((input, scoreIndex) => {
